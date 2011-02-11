@@ -21,9 +21,13 @@ d.body.appendChild(button);
 
 unsafeWindow.Propagate = function () {
 	var varlist = String(GM_getValue("varlist")).split('|');
+	var sss = "DATA<br>";	
 	for (key in varlist) {
-		document.getElementsByName(varlist[key])[0].value = GM_getValue(varlist[key],"default");
+		sss += varlist[key]+" = "+GM_getValue(varlist[key],"***")+"<br>";
 	}
+	var ppp = d.createElement("p");
+	ppp.innerHTML = sss;
+	d.body.appendChild(ppp);
 }
 
 unsafeWindow.DoTheMagic = function (){
