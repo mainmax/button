@@ -19,7 +19,10 @@ button.href = "javascript: DoTheMagic();";
 d.body.appendChild(button);
 
 unsafeWindow.Propagate = function () {
-	document.getElementsByName('val2')[0].value = GM_getValue("max","no val");
+	var varlist = String(GM_getValue("varlist")).split('|');
+	for (key in varlist) {
+		document.getElementsByName(varlist[key])[0].value = GM_getValue(varlist[key],"default");
+	}
 }
 
 unsafeWindow.DoTheMagic = function (){
@@ -36,7 +39,9 @@ d.getElementsByName('val3')[0].value = "Finish";
 
 if (String(d.location).indexOf('unitedmotorsjax.com')>0)  {
 
-GM_setValue("max",d.data.itn.value);
+// varlist contains key names of parameters to pass.
+GM_setValue("varlist","val1|val2");
+GM_setValue("val1","test");
 
 var info = d.createElement("p");
 info.innerHTML = "this is " + d.location;
