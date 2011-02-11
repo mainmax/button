@@ -22,6 +22,7 @@ d.body.appendChild(button);
 unsafeWindow.Propagate = function () {
 	var varlist = String(GM_getValue("varlist")).split('|');
 	var sss = "DATA<br>";	
+	sss += GM_getValue("varlist")+"<br>";
 	for (key in varlist) {
 		sss += varlist[key]+" = "+GM_getValue(varlist[key],"***")+"<br>";
 	}
@@ -44,9 +45,18 @@ d.getElementsByName('val3')[0].value = "Finish";
 
 if (String(d.location).indexOf('unitedmotorsjax.com')>0)  {
 
+var dataform = d.getElementsByName("data")[0].elements;
+var varlist = "";
+
+for (var item=0; item < dataform.length; item++) {
+	varlist += dataform[item].name+"|";
+	GM_setValue(dataform[item].name,dataform[item].value);	
+}
+varlist = varlist.substr(0, varlist.length-1);
 // varlist contains key names of parameters to pass.
-GM_setValue("varlist","val1|val2");
-GM_setValue("val1","test");
+
+GM_setValue("varlist",varlist);
+
 
 var info = d.createElement("p");
 info.innerHTML = "this is " + d.location;
