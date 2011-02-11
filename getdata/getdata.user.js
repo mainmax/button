@@ -5,6 +5,7 @@
 // ==/UserScript==
 
 var d= unsafeWindow.document;
+window.d = d;
 
 if (String(d.location).indexOf('127.0.0.1')>0)  {
 d.getElementsByName('val1')[0].value = "Start";
