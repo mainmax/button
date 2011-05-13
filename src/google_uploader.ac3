@@ -1,0 +1,302 @@
+package com.google.uploader {
+    import flash.events.*;
+    import flash.net.*;
+    import flash.display.*;
+    import flash.utils.*;
+    import flash.system.*;
+    import flash.external.*;
+
+    public class FileUploader extends Sprite {
+
+        public static var API_ID:String;
+        public static var API_INIT:String = "onUploaderApiReady";
+        private static var FILE_ID:int = 0;
+        private static var OVERLAY_ALPHA:Number;
+
+        private var fileMultiSelect:Boolean;
+        private var allowAddingFiles:Boolean;
+        private var fileTypeList:Array;
+        private var fileIds:Dictionary;
+        private var browseOverlay:Sprite;
+        private var fileRefList:FileReferenceList;
+        private var fileRef:FileReference;
+        private var files:Object;
+
+        public function FileUploader(){
+            super();
+            var flashParams:* = LoaderInfo(this.root.loaderInfo).parameters;
+            API_ID = ((("apiId" in flashParams)) ? String(flashParams.apiId).replace(/[^0-9a-z_\-]+/gi, "") : "");
+            OVERLAY_ALPHA = ((("alpha" in flashParams)) ? Number(flashParams.alpha) : 0);
+            this.files = {};
+            this.fileIds = new Dictionary();
+            this.fileTypeList = [];
+            this.fileMultiSelect = true;
+            this.fileRefList = new FileReferenceList();
+            this.fileRefList.addEventListener(Event.SELECT, this.handleEvent);
+            this.fileRefList.addEventListener(Event.CANCEL, this.handleEvent);
+            this.allowAddingFiles = true;
+            stage.align = StageAlign.TOP_LEFT;
+            stage.scaleMode = StageScaleMode.NO_SCALE;
+            stage.showDefaultContextMenu = false;
+            stage.addEventListener(MouseEvent.MOUSE_OVER, this.handleEvent);
+            stage.addEventListener(MouseEvent.MOUSE_OUT, this.handleEvent);
+            stage.addEventListener(MouseEvent.MOUSE_UP, function (_arg1:MouseEvent):void{
+                handleEvent(_arg1);
+                browse(fileMultiSelect, fileTypeList);
+            });
+            stage.addEventListener(Event.RESIZE, function (_arg1:Event):void{
+                resizeBrowseOverlay();
+            });
+            this.createBrowseOverlay();
+            Security.allowDomain("*");
+            this.initializeJsEvents();
+            this.registerCallbacks();
+        }
+        public static function arrayFromJs(_arg1:Object):Array{
+            var _local3:String;
+            var _local4:Number;
+            if ((_arg1 is Array)){
+                return ((_arg1 as Array));
+            };
+            var _local2:Array = [];
+            for (_local3 in _arg1) {
+                _local4 = parseInt(_local3);
+                if (!isNaN(_local4)){
+                    _local2[_local4] = _arg1[_local3];
+                };
+            };
+            return (_local2);
+        }
+
+        public function getFile(_arg1:String):FileReference{
+            if (this.isValidFileId(_arg1)){
+                return (this.files[_arg1]);
+            };
+            return (null);
+        }
+        public function startUpload(_arg1:String, _arg2:String, _arg3:Object=null, _arg4:String="Filedata"):Boolean{
+            var _local5:URLRequest;
+            var _local6:FileReference;
+            var _local7:URLVariables;
+            var _local8:String;
+            if (this.isValidFileId(_arg1)){
+                _local5 = new URLRequest(_arg2);
+                if (_arg3){
+                    _local7 = new URLVariables();
+                    for (_local8 in _arg3) {
+                        _local7[_local8] = _arg3[_local8];
+                    };
+                    _local5.data = _local7;
+                    _local5.method = URLRequestMethod.POST;
+                };
+                _local6 = this.getFile(_arg1);
+                this.enableJsEvents(_local6, true);
+                _local6.upload(_local5, _arg4);
+                return (true);
+            };
+            return (false);
+        }
+        private function addFile(_arg1:FileReference):String{
+            var _local2:String = String(++FILE_ID);
+            this.files[_local2] = _arg1;
+            this.fileIds[_arg1] = _local2;
+            return (_local2);
+        }
+        private function registerSelectedFiles(_arg1:Object):Array{
+            var _local2:Array;
+            if ((_arg1 is FileReference)){
+                _local2 = [_arg1];
+            } else {
+                if ((_arg1 is FileReferenceList)){
+                    _local2 = _arg1.fileList;
+                };
+            };
+            var _local3:int;
+            while (_local3 < _local2.length) {
+                this.addFile(_local2[_local3]);
+                _local3++;
+            };
+            return (_local2);
+        }
+        public function isValidFileId(_arg1:String):Boolean{
+            return ((_arg1 in this.files));
+        }
+        private function createBrowseOverlay():void{
+            this.browseOverlay = new Sprite();
+            this.browseOverlay.buttonMode = true;
+            this.browseOverlay.useHandCursor = true;
+            addChild(this.browseOverlay);
+            this.resizeBrowseOverlay();
+        }
+        public function getAllowedFileTypes():Array{
+            return (this.fileTypeList);
+        }
+        public function setAllowAddingFiles(_arg1:Boolean):void{
+            this.allowAddingFiles = _arg1;
+        }
+        public function browse(_arg1:Boolean=true, _arg2:Array=null):Boolean{
+            var _local4:Object;
+            var _local5:int;
+            if (!this.allowAddingFiles){
+                return (false);
+            };
+            var _local3:Array = [];
+            if (_arg2){
+                _local5 = 0;
+                while (_local5 < _arg2.length) {
+                    _local4 = _arg2[_local5];
+                    _local3[_local5] = new FileFilter(_local4.description, _local4.extension);
+                    _local5++;
+                };
+            };
+            if (!_arg1){
+                this.fileRef = new FileReference();
+                this.fileRef.addEventListener(Event.SELECT, this.handleEvent);
+                this.fileRef.addEventListener(Event.CANCEL, this.handleEvent);
+                return (((_local3.length) ? this.fileRef.browse(_local3) : this.fileRef.browse()));
+            };
+            return (((_local3.length) ? this.fileRefList.browse(_local3) : this.fileRefList.browse()));
+        }
+        private function resizeBrowseOverlay():void{
+            this.browseOverlay.graphics.clear();
+            this.browseOverlay.graphics.beginFill(0xFF0000, OVERLAY_ALPHA);
+            this.browseOverlay.graphics.drawRect(0, 0, stage.stageWidth, stage.stageHeight);
+            this.browseOverlay.graphics.endFill();
+        }
+        public function setMultiSelect(_arg1:Boolean):void{
+            this.fileMultiSelect = _arg1;
+        }
+        public function setAllowedFileTypes(_arg1:Array):void{
+            this.fileTypeList = _arg1;
+        }
+        public function getSafeFile(_arg1:String):Object{
+            if (!this.isValidFileId(_arg1)){
+                return (null);
+            };
+            return (this.getSafeFileInternal(this.getFile(_arg1)));
+        }
+        private function handleEvent(_arg1:Object):void{
+            var _local4:Array;
+            var _local2:Object = JsEventDispatcher.createEvent(_arg1.type);
+            if (FileUploader.API_ID){
+                _local2.apiId = FileUploader.API_ID;
+            };
+            var _local3:String = (((_arg1.target is FileReference)) ? this.getFileId(_arg1.target) : null);
+            if (_local3){
+                _local2.file = _local3;
+            };
+            switch (_arg1.type){
+                case Event.SELECT:
+                    _local4 = this.registerSelectedFiles(_arg1.target);
+                    _local2.files = this.getSafeFileList(_local4);
+                    break;
+                case DataEvent.UPLOAD_COMPLETE_DATA:
+                    _local2.data = _arg1.data.replace(/\\/g, "\\\\");
+                    break;
+                case ProgressEvent.PROGRESS:
+                    _local2.bytesLoaded = _arg1.bytesLoaded;
+                    _local2.bytesTotal = _arg1.bytesTotal;
+                    break;
+                case HTTPStatusEvent.HTTP_STATUS:
+                    _local2.code = _arg1.status;
+                    break;
+                case IOErrorEvent.IO_ERROR:
+                case SecurityErrorEvent.SECURITY_ERROR:
+                    _local2.error = _arg1.text;
+                    break;
+            };
+            JsEventDispatcher.dispatchEvent(_local2);
+        }
+        public function cancelUpload(_arg1:String):void{
+            var _local2:FileReference;
+            if (this.isValidFileId(_arg1)){
+                _local2 = this.getFile(_arg1);
+                this.enableJsEvents(_local2, false);
+                _local2.cancel();
+            };
+        }
+        public function getSafeFileList(_arg1:Array):Array{
+            var _local2:Array = [];
+            var _local3:int;
+            while (_local3 < _arg1.length) {
+                _local2.push(this.getSafeFileInternal(_arg1[_local3]));
+                _local3++;
+            };
+            return (_local2);
+        }
+        public function getMultiSelect():Boolean{
+            return (this.fileMultiSelect);
+        }
+        public function removeFile(_arg1:String):void{
+            if ((_arg1 in this.files)){
+                this.cancelUpload(_arg1);
+                delete this.fileIds[this.files[_arg1]];
+                delete this.files[_arg1];
+            };
+        }
+        private function enableJsEvents(_arg1:IEventDispatcher, _arg2:Boolean):void{
+            var _local3:Function;
+            if (_arg2){
+                _local3 = _arg1.addEventListener;
+            } else {
+                _local3 = _arg1.removeEventListener;
+            };
+            _local3(Event.OPEN, this.handleEvent);
+            _local3(Event.COMPLETE, this.handleEvent);
+            _local3(DataEvent.UPLOAD_COMPLETE_DATA, this.handleEvent);
+            _local3(ProgressEvent.PROGRESS, this.handleEvent);
+            _local3(HTTPStatusEvent.HTTP_STATUS, this.handleEvent);
+            _local3(IOErrorEvent.IO_ERROR, this.handleEvent);
+            _local3(SecurityErrorEvent.SECURITY_ERROR, this.handleEvent);
+        }
+        protected function registerCallbacks():void{
+            ExternalInterface.addCallback("addListener", JsEventDispatcher.registerListener);
+            ExternalInterface.addCallback("browse", this.browse);
+            ExternalInterface.addCallback("cancelUpload", this.cancelUpload);
+            ExternalInterface.addCallback("getFile", this.getSafeFile);
+            ExternalInterface.addCallback("removeFile", this.removeFile);
+            ExternalInterface.addCallback("startUpload", this.startUpload);
+            ExternalInterface.addCallback("setMultiSelect", this.setMultiSelect);
+            ExternalInterface.addCallback("getMultiSelect", this.getMultiSelect);
+            ExternalInterface.addCallback("setAllowedFileTypes", function (_arg1:Object):void{
+                setAllowedFileTypes(arrayFromJs(_arg1));
+            });
+            ExternalInterface.addCallback("getAllowedFileTypes", this.getAllowedFileTypes);
+            ExternalInterface.addCallback("setAllowAddingFiles", this.setAllowAddingFiles);
+            if (ExternalInterface.available){
+                ExternalInterface.call(API_INIT, API_ID);
+            };
+        }
+        private function getFileId(_arg1:FileReference):String{
+            if ((_arg1 in this.fileIds)){
+                return (this.fileIds[_arg1]);
+            };
+            return (null);
+        }
+        private function initializeJsEvents():void{
+            JsEventDispatcher.registerEventType(Event.SELECT, "onSelected");
+            JsEventDispatcher.registerEventType(Event.CANCEL, "onCancel");
+            JsEventDispatcher.registerEventType(Event.OPEN, "onOpen");
+            JsEventDispatcher.registerEventType(Event.COMPLETE, "onComplete");
+            JsEventDispatcher.registerEventType(DataEvent.UPLOAD_COMPLETE_DATA, "onCompleteData");
+            JsEventDispatcher.registerEventType(ProgressEvent.PROGRESS, "onProgress");
+            JsEventDispatcher.registerEventType(HTTPStatusEvent.HTTP_STATUS, "onHttpError");
+            JsEventDispatcher.registerEventType(IOErrorEvent.IO_ERROR, "onIoError");
+            JsEventDispatcher.registerEventType(SecurityErrorEvent.SECURITY_ERROR, "onSecurityError");
+            JsEventDispatcher.registerEventType(MouseEvent.MOUSE_OVER, "onMouseOver");
+            JsEventDispatcher.registerEventType(MouseEvent.MOUSE_OUT, "onMouseOut");
+            JsEventDispatcher.registerEventType(MouseEvent.MOUSE_UP, "onMouseClick");
+        }
+        private function getSafeFileInternal(_arg1:FileReference):Object{
+            return ({
+                id:this.getFileId(_arg1),
+                name:_arg1.name,
+                creationDate:_arg1.creationDate.getTime(),
+                modificationDate:_arg1.modificationDate.getTime(),
+                size:_arg1.size,
+                type:_arg1.type
+            });
+        }
+
+    }
+}//package com.google.uploader 
